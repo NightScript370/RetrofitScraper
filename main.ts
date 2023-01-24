@@ -41,7 +41,7 @@ Deno.serve({ port: 60626 }, async (req) => {
 		if (channelConfig.get("user_id") !== "U04DCRDL370")
 			return new Response("This command can only be ran by its creator.");
 
-		const result = await client.conversations.history({ channel: channelConfig.get("channel_id") });
+		const result = await client.conversations.history({ channel: channelConfig.get("channel_id"), limit: 1000 });
 		const messages = result.messages!;
 
 		const filesObj = messages.filter((message) => "files" in message).map((message) => message.files).flat()
@@ -59,14 +59,7 @@ Deno.serve({ port: 60626 }, async (req) => {
 		
 		try {
 			const addressNumber = dirName.split('-')[0];
-
-			const channelInfoFetch = await fetch(`https://slack.com/api/conversations.info?channel=${channelConfig.get("channel_id")}`, {
-				headers: new Headers({
-					'Authorization': `Bearer ${config.token}`,
-					'Content-Type': 'application/x-www-form-urlencoded'
-				})
-			})
-			const channelInfo = await channelInfoFetch.json();
+			const channelInfo = await client.conversations.info({ channel: channelConfig.get("channel_id") });
 
 			const description = channelInfo.purpose.value;
 			if (!description.includes(addressNumber))
