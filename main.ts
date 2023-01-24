@@ -48,13 +48,43 @@ Deno.serve({ port: 60626 }, async (req) => {
 		const fileLinks = filesObj
 			.filter((media) => media!.mimetype?.startsWith('image'))
 			.map((imageMedia) => imageMedia?.url_private_download).filter(Boolean)
+		
+		const dirName = channelConfig.get("channel_name").split("-").filter(Boolean).join("-");
+		ensureDir(`./${dirName}`);
+		
+		const infoJSON = {
+			"exempt": false, //RARELY is exempt true. Assume it false and manually edit afterwards
+			"banner":"" // There are thousands of images in here. Assume that any one of them can be deleted, so this will be a manual insertion
+		}
+		
+		try {
+			const addressNumber = dirName.split('-')[0];
+
+			const channelInfoFetch = await fetch(`https://slack.com/api/conversations.info?channel=${channelConfig.get("channel_id")}`, {
+				headers: new Headers({
+					'Authorization': `Bearer ${config.token}`,
+					'Content-Type': 'application/x-www-form-urlencoded'
+				})
+			})
+			const channelInfo = await channelInfoFetch.json();
+
+			const description = channelInfo.purpose.value;
+			if (!description.includes(addressNumber))
+			    throw Error();
+
+			const lineWithAddress = description.split("\n").find(descLine => descLine.includes(addressNumber))
+			infoJSON.title = lineWithAddress.substring(lineWithAddress.indexOf(addressNumber)).split(",")[0]
+		} catch (_e) {
+			infoJSON.title = dirName.replaceAll("-", " ").replace(/(^\w{1})|(\s+\w{1})/g, letter => letter.toUpperCase())
+		}
+
+		await Deno.writeTextFile(`./${dirName}/info.json`, JSON.stringify(infoJSON))
 
 		console.log(fileLinks.length + " files to download")
 		for (const link of fileLinks) {
 			console.log(`[${fileLinks.indexOf(link)}/${fileLinks.length}] ${link}`)
-			ensureDir(`./${channelConfig.get("channel_name")}`);
-        	let path = `./${channelConfig.get("channel_name")}/` + link!.split('/').at(-1)!;
-        	while (await exists(path)) {
+			let path = `./${dirName}/` + link!.split('/').at(-1)!;
+			while (await exists(path)) {
 				const filename:string[] = [path.split(".").at(-2) + '_1', path.split(".").at(-1)!]
 				path = path.split(".").splice(0, path.split(".").length - 2)
 					.concat(filename).join('.');
